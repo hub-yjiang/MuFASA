@@ -28,6 +28,8 @@ tumor_normal_pairs.txt, comma seperated file with information for the somatic va
 filter_parameters.txt. This is the configuration used for [FiNGS](https://pubmed.ncbi.nlm.nih.gov/33602113/)   
 This tool is used for filtering SNP's after variant calling
 
+Inputs can also be mapped bam files, the samples.csv need to be a comma seperated file with a header of "sampleID,bam,bai", following the absolute path of the bam and bai files. 
+
 ## workflow testing
 In the TESTDATA dir is a testset with fastq data to test your installation.  
 If your installation is correct, you will be able to run this data set by running:
