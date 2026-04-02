@@ -116,3 +116,23 @@ process Samtools_index {
         samtools index -@ ${task.cpus} -o ${sample_id}_samtools_markdup.bai ${unindexed_bam}
         """
 }
+
+process Samtools_bamtocram {
+    label 'samtools_sort'
+    shell = ['/bin/bash', '-euo', 'pipefail']
+    conda '/groups/group-garaycoechea/linda/envs/samtools_picard'
+    publishDir params.mapping_dir, mode: 'copy'
+    errorStrategy 'finish'
+
+    input:
+        tuple(val(sample_id), path(dupmarked_bam))
+   
+    output:
+        tuple(val(sample_id), path("${sample_id}_markdup.cram"))
+
+    script:
+    """
+    samtools view -@ ${task.cpus} -C -T ${params.ref} -o ${sample_id}_markdup.cram ${dupmarked_bam}
+    samtools index ${sample_id}_markdup.cram
+    """
+}

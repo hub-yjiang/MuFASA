@@ -3,7 +3,7 @@ process Strelka {
     label 'strelka'
     shell = ['/bin/bash', '-euo', 'pipefail']
     conda '/groups/group-garaycoechea/linda/envs/strelka'
-    publishDir "${params.strelka}"
+    publishDir "${params.strelka}", mode: 'copy'
     executor 'slurm'
 
     input:
@@ -24,7 +24,7 @@ process handleStrelka {
     label 'mutect_flag'
     shell = ['/bin/bash', '-euo', 'pipefail']
     conda '/groups/group-garaycoechea/linda/envs/pipeline'
-    publishDir "${params.strelka}"  
+    publishDir "${params.strelka}", mode: 'copy'
     executor 'slurm'
 
   input:
@@ -57,7 +57,7 @@ process Mutect2 {
 
   script:
       """
-      gatk Mutect2 --native-pair-hmm-threads 4 -R ${params.ref} --callable-depth ${params.callable_depth} -I ${tumor_bam} -normal ${normalid} -I ${normal_bam} -L chr${chrID} -O ${tumorid}_${chrID}.vcf.gz
+      gatk Mutect2 --native-pair-hmm-threads 4 -R ${params.ref} --callable-depth ${params.callable_depth} --max-mnp-distance 0 -I ${tumor_bam} -normal ${normalid} -I ${normal_bam} -L chr${chrID} -O ${tumorid}_${chrID}.vcf.gz
       """
 }
 
@@ -66,7 +66,7 @@ process Mutect2_flag {
   label 'mutect_flag'
   shell = ['/bin/bash', '-euo', 'pipefail']
   conda '/groups/group-garaycoechea/linda/envs/gatk4'
-  publishDir "${params.mutect}"  
+  publishDir "${params.mutect}", mode: 'copy'
   executor 'slurm'
 
   input:
@@ -85,7 +85,7 @@ process Mutect2_concat {
   label 'mutect_flag'
   shell = ['/bin/bash', '-euo', 'pipefail']
   conda '/groups/group-garaycoechea/linda/envs/pipeline'
-  publishDir "${params.mutect}"  
+  publishDir "${params.mutect}", mode: 'copy'
   executor 'slurm'
 
   input:
@@ -147,7 +147,7 @@ process Gridss_extract {
     label 'gridss'
     container = 'docker://gridss/gridss:2.13.2'
     shell = ['/bin/bash', '-euo', 'pipefail']
-    //publishDir "${params.gridss_output}", mode: 'copy'
+    publishDir "${params.gridss}", mode: 'copy'
     executor 'slurm'
 
     input:
@@ -159,7 +159,16 @@ process Gridss_extract {
     script:
       """
 
-        /opt/gridss/gridss_extract_overlapping_fragments -t ${task.cpus} -w ${params.gridss} -o ${sample_id}.regions.bam --targetbed ${bed} ${bam}
+        if [ ! -s "${bed}" ]; then
+        echo "WARNING: BED file ${bed} is empty for ${sample_id}. gridss_extract skipped"
+        
+        # Option A: Create a dummy BAM 
+        samtools view -H ${bam} | samtools view -b - > ${sample_id}.regions.bam
+        
+        exit 0
+    fi
+
+        gridss_extract_overlapping_fragments -t ${task.cpus} -w ${params.gridss} -o ${sample_id}.regions.bam --targetbed ${bed} ${bam}
       
       """
 }
@@ -189,8 +198,9 @@ process Manta {
     label 'manta'
     shell = ['/bin/bash', '-euo', 'pipefail']
     conda '/groups/group-garaycoechea/miniforge3/envs/manta'
-    //publishDir "${params.manta}"
+    publishDir "${params.manta}", mode: 'copy'
     executor 'slurm'
+    errorStrategy 'ignore'
 
     input:
         tuple( val(tumor_id), val(normal_sample_id), path(tumor_bam), path(normal_bam), path(tumor_bai), path(normal_bai) )

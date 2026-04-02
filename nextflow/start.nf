@@ -1,42 +1,60 @@
 
-include { MergeFastq; FastQC; CUTadapt} from '/groups/group-garaycoechea/software/MuFASA/nextflow/modules/FASTQprocessing.nf'
-include { BWAMapping; Samtools_index; Samtools_sort; Samtools_fixmate; Picard_cleansam; Samtools_markdup } from '/groups/group-garaycoechea/software/MuFASA/nextflow/modules/Mapping.nf'
-include { WgsMetrics; AlignmentSummary; PlotVAF } from '/groups/group-garaycoechea/software/MuFASA/nextflow/modules/Statistics.nf'
-include { preVariantCalling; add_indel_snvs_tags; defineOrderISEC } from '/groups/group-garaycoechea/software/MuFASA/nextflow/modules/processing.nf'
-include { Strelka; handleStrelka; Mutect2; Mutect2_flag; Mutect2_concat; Manta; Gridss_extract; Gridss_index; Gridss } from '/groups/group-garaycoechea/software/MuFASA/nextflow/modules/VariantCalling.nf'
-include { PASSfilter; ISEC_overlap; PoN_filter; FiNGS; snvsVAF; handleFings; indelFiltering; Manta_pass; Manta_encode; Manta_filtering; Gridss_filter;  GridssManta_validate} from '/groups/group-garaycoechea/software/MuFASA/nextflow/modules/VariantFiltering.nf'
+include { MergeFastq; FastQC; CUTadapt} from '/groups/group-garaycoechea/Yang/Temp/MuFASA/nextflow/modules/FASTQprocessing.nf'
+include { BWAMapping; Samtools_index; Samtools_sort; Samtools_fixmate; Picard_cleansam; Samtools_markdup; Samtools_bamtocram } from '/groups/group-garaycoechea/Yang/Temp/MuFASA/nextflow/modules/Mapping.nf'
+include { WgsMetrics; AlignmentSummary; PlotVAF; VariantCounts } from '/groups/group-garaycoechea/Yang/Temp/MuFASA/nextflow/modules/Statistics.nf'
+include { preVariantCalling; add_indel_snvs_tags; defineOrderISEC } from '/groups/group-garaycoechea/Yang/Temp/MuFASA/nextflow/modules/processing.nf'
+include { Strelka; handleStrelka; Mutect2; Mutect2_flag; Mutect2_concat; Manta; Gridss_extract; Gridss_index; Gridss } from '/groups/group-garaycoechea/Yang/Temp/MuFASA/nextflow/modules/VariantCalling.nf'
+include { PASSfilter; ISEC_overlap; PoN_filter; FiNGS; snvsVAF; handleFings; indelFiltering; Manta_pass; Manta_encode; Manta_filtering; Gridss_filter;  GridssManta_validate} from '/groups/group-garaycoechea/Yang/Temp/MuFASA/nextflow/modules/VariantFiltering.nf'
 
-workflow {
-	main:
-	 
-	names_paths = Channel.fromPath(params.samples)
+params.cram = false
+params.start_from = "fastq"
+
+main: workflow {
+	
+	if (params.start_from == 'fastq') {
+
+		names_paths = Channel.fromPath(params.samples)
 				   		 .splitCsv()//.view()
-
-	pair1 = names_paths.map{ it -> [it[0],params.fastq_path + it[1],"1"]}.groupTuple(by: 0)
-	pair2 = names_paths.map{ it -> [it[0],params.fastq_path + it[2],"2"]}.groupTuple(by: 0)
-
-	merge_input = pair1.concat(pair2).map{ it -> [it[0],it[1],it[2][0]]}
-
-	// ------------FASTQ processing
-	MergeFastq(merge_input) 
-	merge_paired = MergeFastq.out.groupTuple(by:0)
-	CUTadapt(merge_paired)
-	fastqc_input = CUTadapt.out.flatMap{ sample_id, file_list -> file_list}
-	FastQC(fastqc_input)
-
-	// --------------MAPPING-------------------
-	BWAMapping(CUTadapt.out) 
-	Picard_cleansam(BWAMapping.out)
-	Samtools_fixmate(Picard_cleansam.out)
-	Samtools_sort(Samtools_fixmate.out)
-	Samtools_markdup(Samtools_sort.out)
-	bam_indexed = Samtools_index(Samtools_markdup.out)
-
-	// -------------MAPPING METRICS -----------
-
-	WgsMetrics(Samtools_markdup.out)
-	AlignmentSummary(Samtools_markdup.out)
-
+	
+		pair1 = names_paths.map{ it -> [it[0],params.fastq_path + it[1],"1"]}.groupTuple(by: 0)
+		pair2 = names_paths.map{ it -> [it[0],params.fastq_path + it[2],"2"]}.groupTuple(by: 0)
+	
+		merge_input = pair1.concat(pair2).map{ it -> [it[0],it[1],it[2][0]]}
+	
+		// ------------FASTQ processing
+		MergeFastq(merge_input) 
+		merge_paired = MergeFastq.out.groupTuple(by:0)
+		CUTadapt(merge_paired)
+		fastqc_input = CUTadapt.out.flatMap{ sample_id, file_list -> file_list}
+		FastQC(fastqc_input)
+	
+		// --------------MAPPING-------------------
+		BWAMapping(CUTadapt.out) 
+		Picard_cleansam(BWAMapping.out)
+		Samtools_fixmate(Picard_cleansam.out)
+		Samtools_sort(Samtools_fixmate.out)
+		Samtools_markdup(Samtools_sort.out)
+		bam_indexed = Samtools_index(Samtools_markdup.out) 
+	
+	
+		if (params.cram) {
+    	// Only run CRAM conversion and stop
+    	    Samtools_bamtocram(Samtools_markdup.out)
+    		error "Pipeline stopped intentionally"
+    		} 
+	
+		// -------------MAPPING METRICS -----------
+	
+		WgsMetrics(Samtools_markdup.out)
+		AlignmentSummary(Samtools_markdup.out)
+	
+	} else if (params.start_from == 'bam') {
+		
+		bam_indexed = Channel.fromPath(params.samples)
+    			.splitCsv(header:true)
+    			.map { row -> [ row.sampleID, file(row.bam), file(row.bai) ]}
+	}	
+		
 	// -------------VARIANT CALLING -----------
 	// prepare channels for variant calling:
 	chrs = Channel.from(params.chrs)//.view()
@@ -49,6 +67,7 @@ workflow {
 	//		.fromPath(params.ext_bam_conf)
 	//		.splitCsv()
 
+
 	//bamindexed = bam_indexed.concat(extNormal)//.view()  
 	paired = bam_indexed.combine(sample_pairs,by:0).groupTuple(by: 4, size: 2)//.view()
 	//ensure correct order: tumor normal
@@ -58,12 +77,13 @@ workflow {
 	strelka_input = ordered_paired.map{ it -> [it[0][0],it[1][0],it[1][1],it[2][0],it[2][1]]}
 	Strelka(strelka_input)
 	strelka_out = handleStrelka(Strelka.out)
-	
+
 	// MUTECT //
 	mutect_input = ordered_paired.map{ it -> [it[0][0],it[0][1],it[1][0],it[1][1]]}
+
 	mut_paired = mutect_input.combine(chrs)
 	Mutect2(mut_paired) //--> TO DO: seperate this, so Chr1, Chr2 are done with different time limit
-	Mutect2.out.view()
+	// Mutect2.out.view()
 
 	Mutect2_flag(Mutect2.out) // --> out: tumorID, *flagged.vcf.gz, chrID
 	concat_input = Mutect2_flag.out.groupTuple(by: 0, size: params.nrChrs) // only start concatenate when all Chromosomes are done.
@@ -109,17 +129,21 @@ workflow {
 
 	// ------------ MANTA Structural Variant Calling ------
 
-	Manta(mutect_input)
+	manta_input = ordered_paired.map{ it -> [it[0][0],it[0][1],it[1][0],it[1][1],it[2][0],it[2][1]]}
+	Manta(manta_input)
 	Manta_pass(Manta.out)
 	Manta_encode(Manta_pass.out)	
 	manta_out = Manta_filtering(Manta_encode.out)
 
 	// ----------- Gridss Structural Variant Calling ------
 
-	gridss_input = mutect_input.combine(manta_out,by:0).map{ it -> [it[0],it[2],it[4],it[7]]}
+	gridss_input = manta_input.combine(manta_out,by:0).map{ it -> [it[0],it[2],it[4],it[7]]}
+	// gridss_input.view()
+
+
     Gridss_extract(gridss_input)
     region_index = Gridss_index(Gridss_extract.out)
-    gridss_in = mutect_input.combine(region_index,by:0).map{ it -> [it[0],it[1],it[6],it[3],it[7],it[5]]}//.view()
+    gridss_in = manta_input.combine(region_index,by:0).map{ it -> [it[0],it[1],it[6],it[3],it[7],it[5]]}//.view()
     Gridss(gridss_in)  
     Gridss_filter(Gridss.out)
     input_intersect = Gridss_filter.out.combine(manta_out,by:0).map{ it -> [it[0],it[1],it[2]]} // -> id. gridss, manta
@@ -127,5 +151,7 @@ workflow {
 	// ---------- Intersect Manta & Gridss output ------
 
     GridssManta_validate(input_intersect)
+
+	VariantCounts(FiNGS.out)
 
 }
