@@ -2,7 +2,7 @@ process MergeFastq {
 
     label 'merge_label'
     conda '/groups/group-garaycoechea/linda/envs/pipeline'
-    publishDir params.merged_dir
+    //publishDir params.merged_dir
 
     input:
         tuple val(sample_id), path(fastq_files), val(pair)
@@ -11,10 +11,21 @@ process MergeFastq {
         tuple(val(sample_id), path("*fq.gz")) 
 
     script:
-    """
-    cat ${fastq_files} > ${sample_id}_${pair}.fq.gz 
+    
+    def is_multiple = (fastq_files instanceof List && fastq_files.size() > 1)
 
-    """
+    // 2. Generate the Bash script based on the result
+    if ( is_multiple ) {
+        """
+        echo "Merging files..."
+        cat ${fastq_files} > ${sample_id}_${pair}.fq.gz
+        """
+    } else {
+        """
+        echo "Linking single file..."
+        ln -s ${fastq_files} ${sample_id}_${pair}.fq.gz
+        """
+    }
 }
 
 
@@ -28,6 +39,7 @@ process FastQC {
 
     script:
     """
+    mkdir -p ${params.fastqc_path}
     fastqc -t ${task.cpus} -o ${params.fastqc_path} $trimmed_file
 
     """

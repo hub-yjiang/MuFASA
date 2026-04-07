@@ -120,7 +120,7 @@ process Samtools_index {
 process Samtools_bamtocram {
     label 'samtools_sort'
     shell = ['/bin/bash', '-euo', 'pipefail']
-    conda '/groups/group-garaycoechea/linda/envs/samtools_picard'
+    conda '/groups/group-garaycoechea/Yang/miniforge3_YJ/envs/samtools_1.19.1'
     publishDir params.mapping_dir, mode: 'copy'
     errorStrategy 'finish'
 
