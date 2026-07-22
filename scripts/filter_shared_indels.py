@@ -122,13 +122,11 @@ def AF(inVCF,tumor,F5final,out_csv,minvaf, maxvaf):
         print("something is wrong with the mutect output, no normal, tumor sample columns available.")
 
     for variants in my_VCF:
-        tumorAD = variants.format("AD")[cl] #allelic depth in Tumor sample. [REf ALT]
-        tumorAD_ALT = tumorAD[1] # tumor ALT depth
-        tumorDP = variants.format("DP")[cl]
-        AF = tumorAD_ALT / tumorDP
+        tumorAF = variants.format("AF")[cl]
+        AF=tumorAF[0]
         #print(str(tumorAD_ALT) + "/" + str(tumorDP) + "=" + str(AF[0]))
 #       total+=1
-        if (AF[0] > minvaf) and (AF[0] < maxvaf):
+        if (AF > minvaf) and (AF < maxvaf):
             passed+=1
             #print(str(AF) + " passed")
             nn.write_record(variants)
@@ -136,7 +134,7 @@ def AF(inVCF,tumor,F5final,out_csv,minvaf, maxvaf):
             #print(str(AF) + " failed")
             failed+=1
     
-        outfile.write(str(round(AF[0],2)))
+        outfile.write(str(round(AF,2)))
         outfile.write("\n")
     #outfile.write(str(total) + "\n")
     outfile.write(str(passed))
