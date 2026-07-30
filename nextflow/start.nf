@@ -9,6 +9,7 @@ include { PASSfilter; ISEC_overlap; PoN_filter; FiNGS; snvsVAF; handleFings; ind
 params.cram = false
 params.bam_only = false
 params.start_from = "fastq"
+params.ext_bam = null
 
 main: workflow {
 	
@@ -90,8 +91,8 @@ main: workflow {
 		} else if (params.start_from == 'bam') {
 			
 			bam_indexed = Channel.fromPath(params.samples)
-    				.splitCsv(header:true)
-    				.map { row -> [ row.sampleID, file(row.bam), file(row.bai) ]}
+    				.splitCsv()
+    				//.map { row -> [ row.sampleID, file(row.bam), file(row.bai) ]}
 		}	
 			
 		// -------------VARIANT CALLING -----------
@@ -101,13 +102,21 @@ main: workflow {
 				.fromPath(params.strelka_conf)
 				.splitCsv()//.view()
 	
-		// if normal is NOT in the mapped set:
-		//extNormal = Channel
-		//		.fromPath(params.ext_bam_conf)
-		//		.splitCsv()
+		if (params.ext_bam) {
+			extNormal = Channel
+				.fromPath(params.ext_bam)
+				.splitCsv()
+
+
+			bam_indexed = bam_indexed.concat(extNormal)//.view()  
+		
+		}
+
 	
 	
-		//bamindexed = bam_indexed.concat(extNormal)//.view()  
+		
+
+
 		paired = bam_indexed.combine(sample_pairs,by:0).groupTuple(by: 4, size: 2)//.view()
 		//ensure correct order: tumor normal
 		ordered_paired = preVariantCalling(paired)
