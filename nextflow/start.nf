@@ -1,6 +1,6 @@
 
 include { MergeFastq; FastQC; CUTadapt} from '/groups/group-garaycoechea/Yang/MuFASA_YJ/nextflow/modules/FASTQprocessing.nf'
-include { BWAMapping; Samtools_index; Samtools_sort; Samtools_fixmate; Picard_cleansam; Samtools_markdup; Samtools_bamtocram } from '/groups/group-garaycoechea/Yang/MuFASA_YJ/nextflow/modules/Mapping.nf'
+include { BWAMapping; Samtools_index; Samtools_sort; Samtools_fixmate; Picard_cleansam; Samtools_markdup; Samtools_bamtocram; Samtools_processing} from '/groups/group-garaycoechea/Yang/MuFASA_YJ/nextflow/modules/Mapping.nf'
 include { WgsMetrics; AlignmentSummary; PlotVAF; VariantCounts } from '/groups/group-garaycoechea/Yang/MuFASA_YJ/nextflow/modules/Statistics.nf'
 include { preVariantCalling; add_indel_snvs_tags; defineOrderISEC } from '/groups/group-garaycoechea/Yang/MuFASA_YJ/nextflow/modules/processing.nf'
 include { Strelka; handleStrelka; Mutect2; Mutect2_flag; Mutect2_concat; Manta; Gridss_extract; Gridss_index; Gridss } from '/groups/group-garaycoechea/Yang/MuFASA_YJ/nextflow/modules/VariantCalling.nf'
@@ -33,17 +33,20 @@ main: workflow {
 		// --------------MAPPING-------------------
 		BWAMapping(CUTadapt.out) 
 		Picard_cleansam(BWAMapping.out)
-		Samtools_fixmate(Picard_cleansam.out)
-		Samtools_sort(Samtools_fixmate.out)
-		Samtools_markdup(Samtools_sort.out)
-		bam_indexed = Samtools_index(Samtools_markdup.out) 
+		Samtools_processing(Picard_cleansam.out)
+		//Samtools_fixmate(Picard_cleansam.out)
+		//Samtools_sort(Samtools_fixmate.out)
+		//Samtools_markdup(Samtools_sort.out)
+		bam_indexed = Samtools_processing.out
 	
 
 	
 		// -------------MAPPING METRICS -----------
-	
-		WgsMetrics(Samtools_markdup.out)
-		AlignmentSummary(Samtools_markdup.out)
+		
+		input_Metrics = Samtools_processing.out.map { sample_id, bam, bai -> tuple(sample_id, bam)}
+
+		WgsMetrics(input_Metrics)
+		AlignmentSummary(input_Metrics)
 
     } else {
 
@@ -69,24 +72,27 @@ main: workflow {
 			// --------------MAPPING-------------------
 			BWAMapping(CUTadapt.out) 
 			Picard_cleansam(BWAMapping.out)
-			Samtools_fixmate(Picard_cleansam.out)
-			Samtools_sort(Samtools_fixmate.out)
-			Samtools_markdup(Samtools_sort.out)
-			bam_indexed = Samtools_index(Samtools_markdup.out) 
+			Samtools_processing(Picard_cleansam.out)
+			//Samtools_fixmate(Picard_cleansam.out)
+			//Samtools_sort(Samtools_fixmate.out)
+			//Samtools_markdup(Samtools_sort.out)
+			bam_indexed = Samtools_processing.out
+	
+
+	
+			// -------------MAPPING METRICS -----------
 		
-		
+			input_Metrics = Samtools_processing.out.map { sample_id, bam, bai -> tuple(sample_id, bam)}
+
+			WgsMetrics(input_Metrics)
+			AlignmentSummary(input_Metrics)
 	
 	
 			if (params.cram) {
-    		// Only run CRAM conversion and stop
+    			// Only run CRAM conversion and stop
     		    Samtools_bamtocram(Samtools_markdup.out)
     			//error "Pipeline stopped intentionally as cram = true"
-    			} 
-		
-			// -------------MAPPING METRICS -----------
-		
-			WgsMetrics(Samtools_markdup.out)
-			AlignmentSummary(Samtools_markdup.out)
+    			}
 		
 		} else if (params.start_from == 'bam') {
 			
@@ -95,6 +101,8 @@ main: workflow {
     				//.map { row -> [ row.sampleID, file(row.bam), file(row.bai) ]}
 		}	
 			
+		
+
 		// -------------VARIANT CALLING -----------
 		// prepare channels for variant calling:
 		chrs = Channel.from(params.chrs)//.view()

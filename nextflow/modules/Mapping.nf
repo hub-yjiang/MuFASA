@@ -39,6 +39,36 @@ process Picard_cleansam {
 }
 
 
+process Samtools_processing {
+    label 'Samtools_processing'
+    shell = ['/bin/bash', '-euo', 'pipefail']
+    conda '/groups/group-garaycoechea/linda/envs/samtools_picard'
+    publishDir params.mapping_dir, mode: 'copy'
+    errorStrategy 'finish'
+
+    input:
+        tuple(val(sample_id), path(cleaned_bam))
+
+    output:
+        //tuple(val(sample_id), path("${sample_id}_samtools_fixed.bam"))
+        tuple(val(sample_id), path("${sample_id}_samtools_markdup.bam"), path("${sample_id}_samtools_markdup.bai"))
+    script:
+        """
+        samtools fixmate -m -@ ${task.cpus} -O BAM ${cleaned_bam} ${sample_id}_samtools_fixed.bam
+        
+        samtools sort -O BAM --threads ${task.cpus} -o ${sample_id}_sorted.bam ${sample_id}_samtools_fixed.bam
+        rm -f ${sample_id}_samtools_fixed.bam
+
+        samtools markdup -@ ${task.cpus} -O BAM ${sample_id}_sorted.bam ${sample_id}_samtools_markdup.bam
+        rm -f ${sample_id}_sorted.bam
+
+        samtools index -@ ${task.cpus} -o ${sample_id}_samtools_markdup.bai ${sample_id}_samtools_markdup.bam
+        
+        """
+}
+
+
+
 process Samtools_fixmate {
     label 'samtools_fixmate'
     shell = ['/bin/bash', '-euo', 'pipefail']
