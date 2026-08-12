@@ -262,3 +262,35 @@ process Manta_filtering {
 
 }
 
+
+process Concat_variants {
+    label 'indel'
+    shell = ['/bin/bash', '-euo', 'pipefail']
+    conda '/groups/group-garaycoechea/linda/envs/pipeline'
+    errorStrategy 'ignore'
+    publishDir "${params.snvs_filtered}", mode: 'copy'
+    //  publishDir "${params.manta}"
+    executor 'slurm'
+
+    input:
+        tuple val(sample_id), path(id_final), path(snv_final) 
+
+    output:
+        tuple val(sample_id), path("${sample_id}.concatenated.vcf")
+
+    script:
+      
+      """
+      bgzip ${id_final} 
+      bgzip ${snv_final}
+
+      bcftools index ${id_final}.gz
+      bcftools index ${snv_final}.gz
+      
+      bcftools concat -a -Ov -o ${sample_id}.concatenated.vcf ${id_final}.gz ${snv_final}.gz
+
+      """
+
+}
+
+

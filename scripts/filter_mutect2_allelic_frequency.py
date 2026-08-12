@@ -46,3 +46,8 @@ for variants in my_VCF:
     allfile.write(str(round(AF,2)))
     allfile.write("\n")
 allfile.write(str(passed))
+
+out.close()
+my_VCF.close()
+allfile.close()
+passfile.close()

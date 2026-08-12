@@ -117,8 +117,8 @@ process VariantCounts {
 
     script:
         """
-        
         cd ${params.project_dir}
+        touch counts.tsv
         chmod +x ${params.script_dir}/count_one_sample.sh
         ${params.script_dir}/count_one_sample.sh ${sample_id}
         """

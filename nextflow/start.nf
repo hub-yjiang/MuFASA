@@ -4,7 +4,7 @@ include { BWAMapping; Samtools_index; Samtools_sort; Samtools_fixmate; Picard_cl
 include { WgsMetrics; AlignmentSummary; PlotVAF; VariantCounts } from '/groups/group-garaycoechea/Yang/MuFASA_YJ/nextflow/modules/Statistics.nf'
 include { preVariantCalling; add_indel_snvs_tags; defineOrderISEC } from '/groups/group-garaycoechea/Yang/MuFASA_YJ/nextflow/modules/processing.nf'
 include { Strelka; handleStrelka; Mutect2; Mutect2_flag; Mutect2_concat; Manta; Gridss_extract; Gridss_index; Gridss } from '/groups/group-garaycoechea/Yang/MuFASA_YJ/nextflow/modules/VariantCalling.nf'
-include { PASSfilter; ISEC_overlap; PoN_filter; FiNGS; snvsVAF; handleFings; indelFiltering; Manta_pass; Manta_encode; Manta_filtering; Gridss_filter;  GridssManta_validate} from '/groups/group-garaycoechea/Yang/MuFASA_YJ/nextflow/modules/VariantFiltering.nf'
+include { PASSfilter; ISEC_overlap; PoN_filter; FiNGS; snvsVAF; handleFings; indelFiltering; Manta_pass; Manta_encode; Manta_filtering; Gridss_filter;  GridssManta_validate; Concat_variants} from '/groups/group-garaycoechea/Yang/MuFASA_YJ/nextflow/modules/VariantFiltering.nf'
 
 params.cram = false
 params.bam_only = false
@@ -13,7 +13,7 @@ params.ext_bam = null
 
 main: workflow {
 	
-	if (params.bam_only) {
+	if (params.start_from == 'fastq' && params.bam_only) {
     	
 		names_paths = Channel.fromPath(params.samples)
 				   		 .splitCsv()//.view()
@@ -43,10 +43,10 @@ main: workflow {
 	
 		// -------------MAPPING METRICS -----------
 		
-		input_Metrics = Samtools_processing.out.map { sample_id, bam, bai -> tuple(sample_id, bam)}
+		//input_Metrics = Samtools_processing.out.map { sample_id, bam, bai -> tuple(sample_id, bam)}
 
-		WgsMetrics(input_Metrics)
-		AlignmentSummary(input_Metrics)
+		//WgsMetrics(input_Metrics)
+		//AlignmentSummary(input_Metrics)
 
     } else {
 
@@ -82,10 +82,10 @@ main: workflow {
 	
 			// -------------MAPPING METRICS -----------
 		
-			input_Metrics = Samtools_processing.out.map { sample_id, bam, bai -> tuple(sample_id, bam)}
+			//input_Metrics = Samtools_processing.out.map { sample_id, bam, bai -> tuple(sample_id, bam)}
 
-			WgsMetrics(input_Metrics)
-			AlignmentSummary(input_Metrics)
+			//WgsMetrics(input_Metrics)
+			//AlignmentSummary(input_Metrics)
 	
 	
 			if (params.cram) {
@@ -207,6 +207,11 @@ main: workflow {
 		// ---------- Intersect Manta & Gridss output ------
 	
     	GridssManta_validate(input_intersect)
+
+    	id_final = indelFiltering.out.map { sample_id, noalt, sbtol, sbzero, rf, af_vcf, af_csv -> tuple(sample_id, af_vcf)}
+    	to_concat = id_final.join(snvsVAF.out)
+
+    	Concat_variants(to_concat)
 	
 		VariantCounts(FiNGS.out)
 	}
